@@ -1,5 +1,4 @@
-import { doc, getDoc, setDoc } from 'firebase/firestore';
-import { db } from './firebase';
+import { apiRequest } from './api';
 
 export interface WPConfig {
   url: string;
@@ -65,16 +64,16 @@ export const mockReservations: Reservation[] = [
 export class WPServices {
   static async getConfig(): Promise<WPConfig | null> {
     try {
-      const snap = await getDoc(doc(db, 'settings', 'wp'));
-      if (snap.exists()) return snap.data() as WPConfig;
+      const data = await apiRequest('get_settings');
+      if (data.settings && data.settings.wp) return data.settings.wp;
     } catch (e) {
-      console.error("Failed to read WP Config from Firestore", e);
+      console.error("Failed to read WP Config", e);
     }
     return null;
   }
 
   static async saveConfig(config: WPConfig): Promise<void> {
-    await setDoc(doc(db, 'settings', 'wp'), config);
+    await apiRequest('save_settings', { key: 'wp', value: config });
   }
 
   static getHeaders(config: WPConfig) {

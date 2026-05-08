@@ -3,8 +3,7 @@ import { Check, Save, Image as ImageIcon } from 'lucide-react';
 import { useTheme } from '../lib/ThemeContext';
 import { WPServices, WPConfig } from '../lib/wp-api';
 import { UserManagement } from './UserManagement';
-import { db, handleFirestoreError, OperationType } from '../lib/firebase';
-import { doc, setDoc } from 'firebase/firestore';
+import { apiRequest } from '../lib/api';
 
 const THEMES = [
   { id: 'default', name: 'Ocean Blueprint', color: 'bg-[#2563eb]' },
@@ -60,11 +59,11 @@ export function Settings({ role, email, appSettings }: { role: string; email: st
     if (role !== 'superadmin') return;
     setBrandingSaveStatus('saving');
     try {
-      await setDoc(doc(db, 'settings', 'app'), branding, { merge: true });
+      await apiRequest('save_settings', { key: 'app', value: branding });
       setBrandingSaveStatus('saved');
       setTimeout(() => setBrandingSaveStatus('idle'), 2500);
     } catch (err) {
-      handleFirestoreError(err, OperationType.UPDATE, 'settings/app');
+      console.error('Failed to save branding:', err);
       setBrandingSaveStatus('idle');
     }
   };

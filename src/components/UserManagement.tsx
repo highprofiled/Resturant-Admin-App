@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { db, handleFirestoreError, OperationType } from '../lib/firebase';
-import { collection, query, getDocs, setDoc, doc, deleteDoc, orderBy } from 'firebase/firestore';
 import { UserPlus, UserX, UserSearch, AlertCircle, ShieldAlert } from 'lucide-react';
+import { apiRequest } from '../lib/api';
 
 export function UserManagement({ role, email: currentUserEmail }: { role: string; email: string }) {
   const [users, setUsers] = useState<any[]>([]);
@@ -14,21 +13,15 @@ export function UserManagement({ role, email: currentUserEmail }: { role: string
   const fetchUsers = async () => {
     setLoading(true);
     try {
-      let q = query(collection(db, 'users'));
-      const querySnapshot = await getDocs(q);
-      const fetchedUsers = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as any));
-      
+      const res = await apiRequest('get_users');
+      let fetchedUsers = res.users || [];
       if (role !== 'superadmin') {
          setUsers(fetchedUsers.filter((u: any) => u.email !== 'highprofiled@gmail.com'));
       } else {
-         setUsers([{ email: 'highprofiled@gmail.com', role: 'superadmin' }, ...fetchedUsers]);
+         setUsers(fetchedUsers);
       }
     } catch (err: any) {
-      if (err.message.includes('Missing or insufficient permissions')) {
-         setError('You do not have permission to view all users. You can still add members.');
-      } else {
-        setError(err.message);
-      }
+      setError(err.message || 'Failed to fetch users.');
     }
     setLoading(false);
   };
@@ -49,15 +42,11 @@ export function UserManagement({ role, email: currentUserEmail }: { role: string
           throw new Error("User already exists");
       }
 
-      await setDoc(doc(db, 'users', emailLower), {
-        email: emailLower,
-        role: 'member',
-        createdAt: new Date().toISOString()
-      });
+      await apiRequest('add_user', { email: emailLower });
       setNewEmail('');
       await fetchUsers();
     } catch (err: any) {
-       handleFirestoreError(err, OperationType.CREATE, `users/${newEmail.toLowerCase()}`);
+       setError(err.message || 'Could not add user.');
     } finally {
        setIsAdding(false);
     }
@@ -71,10 +60,10 @@ export function UserManagement({ role, email: currentUserEmail }: { role: string
     }
     if (confirm(`Remove ${emailToRemove}?`)) {
       try {
-        await deleteDoc(doc(db, 'users', emailToRemove));
+        await apiRequest('delete_user', { email: emailToRemove });
         setUsers(users.filter(u => u.email !== emailToRemove));
       } catch (err: any) {
-        handleFirestoreError(err, OperationType.DELETE, `users/${emailToRemove}`);
+        setError(err.message || 'Could not delete user.');
       }
     }
   };
@@ -124,7 +113,7 @@ export function UserManagement({ role, email: currentUserEmail }: { role: string
               {isAdding ? 'Inviting...' : 'Add Member'}
             </button>
             <p className="text-xs text-text-muted mt-2">
-              New members can log in using their email address via the Magic Link option.
+              New members can log in using their email address via the Magic Link option. Note: Magic Links require your shared hosting email configuration to be working.
             </p>
           </form>
         </div>

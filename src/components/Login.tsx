@@ -1,10 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import { auth, handleFirestoreError, OperationType, db } from '../lib/firebase';
-import { signInWithEmailAndPassword, sendSignInLinkToEmail, isSignInWithEmailLink, signInWithEmailLink, sendPasswordResetEmail, updatePassword } from 'firebase/auth';
-import { doc, getDoc, setDoc } from 'firebase/firestore';
 import { UtensilsCrossed } from 'lucide-react';
+import { apiRequest } from '../lib/api';
 
-export function Login({ onLogin }: { onLogin: (role: string) => void }) {
+export function Login({ onLogin }: { onLogin: () => void }) {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
@@ -12,66 +10,17 @@ export function Login({ onLogin }: { onLogin: (role: string) => void }) {
   const [message, setMessage] = useState('');
   const [isMagicLink, setIsMagicLink] = useState(false);
 
-  useEffect(() => {
-    // Check if we are returning from a magic link
-    if (isSignInWithEmailLink(auth, window.location.href)) {
-      let savedEmail = window.localStorage.getItem('emailForSignIn');
-      if (!savedEmail) {
-        savedEmail = window.prompt('Please provide your email for confirmation');
-      }
-      setLoading(true);
-      signInWithEmailLink(auth, savedEmail || '', window.location.href)
-        .then(async (result) => {
-          window.localStorage.removeItem('emailForSignIn');
-          await checkAccessAndLogin(result.user);
-        })
-        .catch((err) => {
-          setError(err.message);
-          setLoading(false);
-        });
-    }
-  }, []);
-
-  const checkAccessAndLogin = async (user: any) => {
-    if (user.email === 'highprofiled@gmail.com') {
-      onLogin('superadmin');
-      return;
-    }
-    
-    try {
-      const userDoc = await getDoc(doc(db, 'users', user.email));
-      if (userDoc.exists()) {
-        onLogin(userDoc.data().role || 'member');
-      } else {
-        await auth.signOut();
-        setError('Access denied. You are not registered as a member.');
-        setLoading(false);
-      }
-    } catch (err: any) {
-      if (err.message.includes('permission-denied') || err.code === 'permission-denied') {
-         await auth.signOut();
-         setError('Access denied.');
-      } else {
-         setError(err.message);
-      }
-      setLoading(false);
-    }
-  };
-
   const handlePasswordLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
     setMessage('');
     setLoading(true);
     try {
-      const result = await signInWithEmailAndPassword(auth, email, password);
-      await checkAccessAndLogin(result.user);
+      const result = await apiRequest('login', { email, password });
+      window.localStorage.setItem('auth_token', result.token);
+      onLogin(); // App will reload
     } catch (err: any) {
-      if (err.code === 'auth/user-not-found') {
-        setError('No account found with this email. Try logging in with a Magic Link to create your account.');
-      } else {
-        setError(err.message);
-      }
+      setError(err.message || 'Invalid credentials');
       setLoading(false);
     }
   };
@@ -85,35 +34,11 @@ export function Login({ onLogin }: { onLogin: (role: string) => void }) {
       return;
     }
     setLoading(true);
-    const actionCodeSettings = {
-      url: window.location.origin,
-      handleCodeInApp: true,
-    };
     try {
-      await sendSignInLinkToEmail(auth, email, actionCodeSettings);
-      window.localStorage.setItem('emailForSignIn', email);
+      await apiRequest('magic_link', { email });
       setMessage('A login link has been sent to your email. You can use it to log in and set your password.');
     } catch (err: any) {
-      setError(err.message);
-    }
-    setLoading(false);
-  };
-
-  const handleResetPassword = async () => {
-    if (!email) {
-      setError('Please enter your email first to reset your password.');
-      return;
-    }
-    setLoading(true);
-    try {
-      await sendPasswordResetEmail(auth, email);
-      setMessage('Password reset email sent! Follow the link to set a new password.');
-    } catch (err: any) {
-      if (err.code === 'auth/user-not-found') {
-        setError('Account does not exist yet. Please use the Magic Link to log in for the first time.');
-      } else {
-        setError(err.message);
-      }
+      setError(err.message || 'Could not send link.');
     }
     setLoading(false);
   };
@@ -165,9 +90,6 @@ export function Login({ onLogin }: { onLogin: (role: string) => void }) {
             <div>
               <div className="flex justify-between items-center mb-1">
                 <label className="block text-sm font-medium">Password</label>
-                <button type="button" onClick={handleResetPassword} className="text-xs font-semibold text-primary hover:text-primary-hover">
-                  Forgot?
-                </button>
               </div>
               <input 
                 type="password" 

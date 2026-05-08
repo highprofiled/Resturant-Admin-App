@@ -6,10 +6,7 @@ import { Settings } from './components/Settings';
 import { ThemeProvider } from './lib/ThemeContext';
 import { Login } from './components/Login';
 import { Installer } from './components/Installer';
-import { auth, db } from './lib/firebase';
-import { onAuthStateChanged, signOut } from 'firebase/auth';
-import { doc, getDoc, onSnapshot } from 'firebase/firestore';
-import { WPServices } from './lib/wp-api';
+import { apiRequest } from './lib/api';
 
 const tabs = [
   { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
@@ -22,16 +19,16 @@ function MainLayout({ role, email }: { role: string; email: string }) {
   const [appSettings, setAppSettings] = useState({ name: 'ResoAdmin', description: 'Management Center', logoUrl: '' });
 
   useEffect(() => {
-    const unsub = onSnapshot(doc(db, 'settings', 'app'), (docSnap) => {
-      if (docSnap.exists()) {
-        setAppSettings(prev => ({ ...prev, ...docSnap.data() }));
+    apiRequest('get_settings').then((data) => {
+      if (data.settings && data.settings.app) {
+        setAppSettings(prev => ({ ...prev, ...data.settings.app }));
       }
-    });
-    return () => unsub();
+    }).catch(console.error);
   }, [role]);
 
   const handleLogout = () => {
-    signOut(auth);
+    window.localStorage.removeItem('auth_token');
+    window.location.reload();
   };
 
   return (
@@ -151,56 +148,51 @@ export default function App() {
   const [email, setEmail] = useState<string | null>(null);
 
   useEffect(() => {
-    async function checkSetup() {
-      // Dynamic import to avoid using firestore objects before init
-      const { getStoredFirebaseConfig, auth, db } = await import('./lib/firebase');
-      
-      const config = getStoredFirebaseConfig();
-      if (!config) {
-        setAppState('install');
-        return;
+    async function checkAuth() {
+      // Handle magic link login
+      const params = new URLSearchParams(window.location.search);
+      const magicToken = params.get('magic_token');
+      if (magicToken) {
+        try {
+          const res = await apiRequest('login_with_token', { token: magicToken });
+          window.localStorage.setItem('auth_token', res.token);
+          setRole(res.user.role);
+          setEmail(res.user.email);
+          // Remove token from url
+          window.history.replaceState({}, document.title, "/");
+          setAppState('app');
+          return;
+        } catch(e) {
+          console.error("Magic link failed", e);
+        }
       }
-      
+
       try {
-        const snap = await getDoc(doc(db, 'settings', 'app'));
-        if (!snap.exists()) {
+        const authCheck = await apiRequest('get_me');
+        if (authCheck.user) {
+          setRole(authCheck.user.role);
+          setEmail(authCheck.user.email);
+          setAppState('app');
+        } else {
+          setAppState('login');
+        }
+      } catch (e) {
+        setAppState('login');
+      }
+    }
+
+    async function checkSetup() {
+      try {
+        const setupRes = await apiRequest('check_setup');
+        if (!setupRes.setup) {
           setAppState('install');
           return;
         }
+        await checkAuth();
       } catch (e: any) {
         console.error("Setup check error:", e);
         setAppState('install');
-        return;
       }
-
-      onAuthStateChanged(auth, async (user) => {
-        if (user) {
-          if (user.email === 'highprofiled@gmail.com') {
-            setRole('superadmin');
-            setEmail(user.email);
-          } else {
-            try {
-              const userDoc = await getDoc(doc(db, 'users', user.email!));
-              if (userDoc.exists()) {
-                setRole(userDoc.data().role || 'member');
-                setEmail(user.email);
-              } else {
-                await signOut(auth);
-                setRole(null);
-                setEmail(null);
-              }
-            } catch (e) {
-              setRole(null);
-              setEmail(null);
-            }
-          }
-          setAppState('app');
-        } else {
-          setRole(null);
-          setEmail(null);
-          setAppState('login');
-        }
-      });
     }
 
     checkSetup();
@@ -220,7 +212,7 @@ export default function App() {
 
   return (
     <ThemeProvider>
-      {appState === 'app' && role && email ? <MainLayout role={role} email={email} /> : <Login onLogin={(r) => { /* Auth state listener handles this */ }} />}
+      {appState === 'app' && role && email ? <MainLayout role={role} email={email} /> : <Login onLogin={() => window.location.reload()} />}
     </ThemeProvider>
   );
 }
