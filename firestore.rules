@@ -1,0 +1,38 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    function isSignedIn() { return request.auth != null; }
+    function isSuperAdmin() { return isSignedIn() && request.auth.token.email == 'highprofiled@gmail.com'; }
+    function isVerifiedMember() {
+      // Allow if superadmin or if the user's email exists in the users collection
+      return isSuperAdmin() || exists(/databases/$(database)/documents/users/$(request.auth.token.email));
+    }
+    function incoming() { return request.resource.data; }
+    function existing() { return resource.data; }
+
+    match /users/{email} {
+      // Anyone verified can read, but superadmin is hidden from non-superadmins
+      allow read: if isSuperAdmin() || (isVerifiedMember() && email != 'highprofiled@gmail.com');
+      
+      // Members can add other members, superadmin can add anyone
+      allow create: if isSuperAdmin() || (
+        isVerifiedMember() &&
+        incoming().keys().hasAll(['role', 'email']) &&
+        incoming().keys().size() == 2 &&
+        incoming().role == 'member' &&
+        incoming().email == email
+      );
+
+      allow update, delete: if isSuperAdmin();
+    }
+
+    match /settings/{settingId} {
+      allow read: if true;
+      allow write: if isSuperAdmin();
+    }
+  }
+}
