@@ -71,6 +71,29 @@ async function handleMockApi(action: string, data: any, token: string | null) {
               reject(new Error('Unauthorized'));
             }
             break;
+          case 'wp_proxy':
+            if (!token) throw new Error('Unauthorized');
+            console.log('Mocking WP Proxy:', data.method, data.url);
+            if (data.url.includes('settings') && data.method === 'POST') {
+                resolve({ success: true, message: 'Settings saved (mock)' });
+            } else if (data.url.includes('bookings') && data.method === 'GET') {
+                const mockReservations = [
+                  {
+                    id: 1, name: 'Stephanie Davison', email: 'stephanie.davison@example.com',
+                    phone: '909-539-3238', guests: 80, date: 'Dec 4, 2026', time: '6:00 PM',
+                    type: 'PARTY', table: 'Manual Assign', status: 'Pending'
+                  },
+                  {
+                    id: 2, name: 'Jason White', email: 'jasw71@example.com',
+                    phone: '765-623-6944', guests: 2, date: 'May 9, 2026', time: '8:30 PM',
+                    type: 'STANDARD', table: '1', status: 'Approved'
+                  }
+                ];
+                resolve(mockReservations);
+            } else {
+                resolve({ success: true });
+            }
+            break;
           default:
             reject(new Error('Mock action not implemented: ' + action));
         }

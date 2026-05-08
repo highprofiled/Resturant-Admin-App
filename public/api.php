@@ -196,10 +196,42 @@ if ($action === 'add_user') {
 if ($action === 'delete_user') {
     if (!$user || $user['role'] !== 'superadmin') { echo json_encode(['error' => 'Unauthorized']); exit; }
     $email = strtolower($data['email']);
-    if ($email === 'highprofiled@gmail.com') { echo json_encode(['error' => 'Cannot delete superadmin']); exit; }
+    // Removed hardcoded email check to accommodate variable superadmin emails, optionally you could check if deleting self
     $stmt = $pdo->prepare("DELETE FROM users WHERE email = ?");
     $stmt->execute([$email]);
     echo json_encode(['success' => true]);
+    exit;
+}
+
+if ($action === 'wp_proxy') {
+    if (!$user) { echo json_encode(['error' => 'Unauthorized']); exit; }
+    
+    $wp_url = $data['url'] ?? '';
+    $wp_method = $data['method'] ?? 'GET';
+    $wp_headers = $data['headers'] ?? [];
+    $wp_body = $data['body'] ?? '';
+
+    $ch = curl_init($wp_url);
+    $curl_headers = [];
+    foreach ($wp_headers as $k => $v) {
+        $curl_headers[] = "$k: $v";
+    }
+    
+    curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+    curl_setopt($ch, CURLOPT_HTTPHEADER, $curl_headers);
+    if ($wp_method === 'POST' || $wp_method === 'PUT' || $wp_method === 'PATCH') {
+        curl_setopt($ch, CURLOPT_CUSTOMREQUEST, $wp_method);
+        if ($wp_body) {
+            curl_setopt($ch, CURLOPT_POSTFIELDS, $wp_body);
+        }
+    }
+
+    $response = curl_exec($ch);
+    $status = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+    curl_close($ch);
+
+    http_response_code($status);
+    echo $response;
     exit;
 }
 

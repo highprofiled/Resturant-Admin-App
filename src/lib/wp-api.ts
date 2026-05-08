@@ -93,31 +93,32 @@ export class WPServices {
     try {
       const cleanUrl = config.url.replace(/\/$/, '');
       const cleanEndpoint = config.endpoint.replace(/^\//, '');
-      const response = await fetch(`${cleanUrl}/${cleanEndpoint}`, {
+      const targetUrl = `${cleanUrl}/${cleanEndpoint}`;
+
+      const data = await apiRequest('wp_proxy', {
+        url: targetUrl,
+        method: 'GET',
         headers: this.getHeaders(config),
       });
-
-      if (!response.ok) throw new Error(`WordPress returned ${response.status}`);
       
-      const data = await response.json();
-      
-      return data.map((item: any) => ({
-        id: item.id || Math.random(),
-        name: item.name || item.customer_name || 'Unknown',
-        email: item.email || item.customer_email || '',
-        phone: item.phone || item.customer_phone || '',
-        guests: parseInt(item.guests || item.party_size || '1', 10),
-        date: item.date || item.booking_date || '',
-        time: item.time || item.booking_time || '',
-        type: item.type || 'STANDARD',
-        table: item.table || 'Unassigned',
-        status: item.status === 'approved' ? 'Approved' : (item.status === 'declined' ? 'Declined' : 'Pending'),
-      }));
+      if (Array.isArray(data)) {
+        return data.map((item: any) => ({
+          id: item.id || Math.random(),
+          name: item.name || item.customer_name || 'Unknown',
+          email: item.email || item.customer_email || '',
+          phone: item.phone || item.customer_phone || '',
+          guests: parseInt(item.guests || item.party_size || '1', 10),
+          date: item.date || item.booking_date || '',
+          time: item.time || item.booking_time || '',
+          type: item.type || 'STANDARD',
+          table: item.table || 'Unassigned',
+          status: item.status === 'approved' ? 'Approved' : (item.status === 'declined' ? 'Declined' : 'Pending'),
+        }));
+      } else {
+        throw new Error(data.message || 'Invalid data returned from WordPress');
+      }
     } catch (error: any) {
       console.error("WP API Fetch Error:", error);
-      if (error.message.includes('Failed to fetch') || error.name === 'TypeError') {
-        throw new Error('Could not connect to WordPress. The URL might be incorrect, or CORS is blocking the request from this dashboard.');
-      }
       throw new Error(error.message || 'Failed to fetch reservations');
     }
   }
@@ -132,21 +133,19 @@ export class WPServices {
     try {
       const cleanUrl = config.url.replace(/\/$/, '');
       const cleanEndpoint = config.endpoint.replace(/^\//, '').replace(/bookings\/?$/, 'settings'); // naive replace bookings with settings
-      
-      const response = await fetch(`${cleanUrl}/${cleanEndpoint}`, {
+      const targetUrl = `${cleanUrl}/${cleanEndpoint}`;
+
+      await apiRequest('wp_proxy', {
+        url: targetUrl,
         method: 'POST',
         headers: this.getHeaders(config),
         body: JSON.stringify(settings)
       });
 
-      if (!response.ok) throw new Error('Failed to update plugin settings in WordPress');
       return true;
     } catch (error: any) {
       console.error("WP API Settings Update Error:", error);
-      if (error.message.includes('Failed to fetch') || error.name === 'TypeError') {
-        throw new Error('WP API Settings Update Error: Could not connect to WordPress (Check CORS or Endpoint configuration).');
-      }
-      throw error;
+      throw new Error('WP API Settings Update Error: ' + (error.message || 'Could not connect to WordPress.'));
     }
   }
 
@@ -160,17 +159,19 @@ export class WPServices {
     try {
       const cleanUrl = config.url.replace(/\/$/, '');
       const cleanEndpoint = config.endpoint.replace(/^\//, '');
-      const response = await fetch(`${cleanUrl}/${cleanEndpoint}/${id}`, {
+      const targetUrl = `${cleanUrl}/${cleanEndpoint}/${id}`;
+
+      await apiRequest('wp_proxy', {
+        url: targetUrl,
         method: 'POST', // or PUT depending on your WP REST API
         headers: this.getHeaders(config),
         body: JSON.stringify({ status: status.toLowerCase() })
       });
 
-      if (!response.ok) throw new Error('Failed to update in WordPress');
       return true;
-    } catch (error) {
+    } catch (error: any) {
       console.error("WP API Update Error:", error);
-      throw error;
+      throw new Error('Failed to update status: ' + (error.message || 'Unknown error'));
     }
   }
 }
