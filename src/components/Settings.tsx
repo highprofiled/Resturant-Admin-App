@@ -311,8 +311,21 @@ export function Settings({ role, email, appSettings }: { role: string; email: st
                 className="w-full bg-bg-surface border border-primary/30 rounded-lg py-2.5 px-4 text-text-main shadow-sm focus:border-primary focus:ring-2 focus:ring-primary/40 outline-none transition-all font-mono text-sm"
               />
               <p className="text-xs text-primary/80 mt-2">
-                Check your plugin documentation for the exact GET and POST endpoint path for retrieving/updating bookings.
+                Check your plugin documentation for the exact GET and POST endpoint path for retrieving/updating bookings. We will automatically use <code>/settings</code> instead of <code>/bookings</code> to sync your plugin config.
               </p>
+            </div>
+            
+            <div className="md:col-span-2 border-t border-border-subtle pt-6 mt-4">
+              <h3 className="text-sm font-semibold text-text-main mb-3">Incoming Webhooks (Optional)</h3>
+              <p className="text-xs text-text-muted mb-4">If your WordPress plugin requires a "Webhook URL" to notify this dashboard of new bookings, copy the URL below and paste it into your plugin settings:</p>
+              <div className="flex relative">
+                <input
+                  type="text"
+                  readOnly
+                  value={typeof window !== 'undefined' ? `${window.location.origin}/api.php?action=webhook` : ''}
+                  className="w-full bg-bg-base/50 text-text-muted border border-border-subtle rounded-lg py-2 px-3 text-sm focus:outline-none"
+                />
+              </div>
             </div>
           </div>
         </section>
@@ -350,147 +363,132 @@ export function Settings({ role, email, appSettings }: { role: string; email: st
         </div>
       </section>
 
-      {/* General Configuration */}
-      <section className="bg-bg-surface p-6 md:p-8 rounded-2xl border border-border-subtle shadow-sm relative pt-12">
-        <div className="absolute top-4 right-6">
+      {/* Plugin Configuration */}
+      <section className="bg-bg-surface p-6 md:p-8 rounded-2xl border border-border-subtle shadow-sm relative pt-8 md:pt-8 mb-8">
+        <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 pb-4 border-b border-border-subtle gap-4">
+          <div>
+            <h2 className="text-xl font-bold text-text-main">Plugin Configuration</h2>
+            <p className="text-sm text-text-muted mt-1">Manage standard booking preferences synced with your website.</p>
+          </div>
           <button 
             onClick={handleSavePluginSettings}
             disabled={pluginSettingsStatus === 'saving'}
-            className="inline-flex items-center justify-center gap-2 bg-primary text-white px-5 py-2.5 rounded-lg font-medium text-sm transition-all hover:bg-primary-hover disabled:opacity-70 shadow-sm"
+            className="inline-flex items-center justify-center gap-2 bg-primary text-white px-6 py-2.5 rounded-xl font-bold text-sm transition-all hover:bg-primary-hover disabled:opacity-70 shadow-sm w-full md:w-auto"
           >
             {pluginSettingsStatus === 'saved' ? <Check className="w-4 h-4" /> : <Save className="w-4 h-4" />}
-            {pluginSettingsStatus === 'saving' ? 'Saving...' : pluginSettingsStatus === 'saved' ? 'Saved' : 'Save Plugin Config'}
+            {pluginSettingsStatus === 'saving' ? 'Saving...' : pluginSettingsStatus === 'saved' ? 'Saved Successfully!' : 'Save Configuration'}
           </button>
         </div>
-
-        <h2 className="text-xl font-bold text-text-main mb-6">General Configuration</h2>
         
-        <label className="flex items-start gap-4 cursor-pointer group">
-          <div className="relative flex items-center justify-center mt-0.5">
-            <input
-              type="checkbox"
-              checked={pluginSettings.reservationsEnabled}
-              onChange={(e) => {
-                setPluginSettings({...pluginSettings, reservationsEnabled: e.target.checked});
-                localStorage.setItem('reservations-enabled', String(e.target.checked));
-              }}
-              className="sr-only"
-            />
-            <div className={`w-12 h-6 md:w-14 md:h-7 rounded-full transition-colors duration-200 ease-in-out ${pluginSettings.reservationsEnabled ? 'bg-primary' : 'bg-gray-300 dark:bg-gray-600'}`}>
-              <div className={`absolute top-1 left-1 bg-white w-4 h-4 md:w-5 md:h-5 rounded-full transition-transform duration-200 ease-in-out shadow-sm ${pluginSettings.reservationsEnabled ? 'translate-x-6 md:translate-x-7' : 'translate-x-0'}`} />
-            </div>
-          </div>
+        <div className="space-y-10">
+          {/* General */}
           <div>
-            <p className="text-sm font-semibold text-text-main group-hover:text-primary transition-colors">Enable Reservations</p>
-            <p className="text-sm text-text-muted mt-1 leading-relaxed max-w-lg">
-              Toggle this off to completely disable new reservations on the frontend. A generic message will be displayed to guests.
-            </p>
-          </div>
-        </label>
-      </section>
-
-      {/* Operating Hours */}
-      <section className="bg-bg-surface p-6 md:p-8 rounded-2xl border border-border-subtle shadow-sm">
-        <h2 className="text-xl font-bold text-text-main mb-1">
-          Operating Hours & Rules
-        </h2>
-        <p className="text-text-muted text-sm mb-6">
-          Restrict the times and days available for booking on the frontend form.
-        </p>
-
-        <div className="space-y-6 max-w-2xl">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <div>
-              <label className="block text-sm font-semibold text-text-main mb-2">
-                Opening Time
-              </label>
-              <div className="relative">
+            <h3 className="text-lg font-semibold text-text-main mb-4">General Settings</h3>
+            <label className="flex items-start gap-4 cursor-pointer group">
+              <div className="relative flex items-center justify-center mt-0.5">
                 <input
-                  type="time"
-                  value={pluginSettings.openingTime}
-                  onChange={(e) => setPluginSettings({...pluginSettings, openingTime: e.target.value})}
-                  className="w-full bg-bg-base border border-border-subtle rounded-lg py-2.5 px-4 text-text-main shadow-sm focus:border-primary focus:ring-2 focus:ring-primary/20 outline-none transition-all"
+                  type="checkbox"
+                  checked={pluginSettings.reservationsEnabled}
+                  onChange={(e) => {
+                    setPluginSettings({...pluginSettings, reservationsEnabled: e.target.checked});
+                    localStorage.setItem('reservations-enabled', String(e.target.checked));
+                  }}
+                  className="sr-only"
                 />
+                <div className={`w-12 h-6 md:w-14 md:h-7 rounded-full transition-colors duration-200 ease-in-out ${pluginSettings.reservationsEnabled ? 'bg-primary' : 'bg-gray-300 dark:bg-gray-600'}`}>
+                  <div className={`absolute top-1 left-1 bg-white w-4 h-4 md:w-5 md:h-5 rounded-full transition-transform duration-200 ease-in-out shadow-sm ${pluginSettings.reservationsEnabled ? 'translate-x-6 md:translate-x-7' : 'translate-x-0'}`} />
+                </div>
               </div>
-            </div>
-
-            <div>
-              <label className="block text-sm font-semibold text-text-main mb-2">
-                Closing Time
-              </label>
-              <div className="relative">
-                <input
-                  type="time"
-                  value={pluginSettings.closingTime}
-                  onChange={(e) => setPluginSettings({...pluginSettings, closingTime: e.target.value})}
-                  className="w-full bg-bg-base border border-border-subtle rounded-lg py-2.5 px-4 text-text-main shadow-sm focus:border-primary focus:ring-2 focus:ring-primary/20 outline-none transition-all"
-                />
+              <div>
+                <p className="text-sm font-semibold text-text-main group-hover:text-primary transition-colors">Enable Reservations</p>
+                <p className="text-sm text-text-muted mt-1 leading-relaxed max-w-lg">
+                  Toggle this off to completely disable new reservations on the frontend. A generic message will be displayed to guests.
+                </p>
               </div>
-            </div>
-          </div>
-
-          <div>
-            <label className="block text-sm font-semibold text-text-main mb-3">
-              Days Closed
             </label>
-            <div className="flex flex-wrap gap-3">
-              {days.map((day) => (
-                <label key={day} className="relative flex cursor-pointer has-[:checked]:ring-2 has-[:checked]:ring-primary/50 has-[:checked]:bg-primary-soft rounded-lg border border-border-subtle px-4 py-2 hover:bg-bg-base transition-colors">
+          </div>
+
+          <hr className="border-border-subtle" />
+
+          {/* Operating Hours */}
+          <div>
+            <h3 className="text-lg font-semibold text-text-main mb-1">Operating Hours & Rules</h3>
+            <p className="text-text-muted text-sm mb-6">Restrict the times and days available for booking on the frontend form.</p>
+            
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8 max-w-2xl">
+              <div>
+                <label className="block text-sm font-semibold text-text-main mb-2">Opening Time</label>
+                <div className="relative">
                   <input
-                    type="checkbox"
-                    checked={pluginSettings.daysClosed.includes(day)}
-                    onChange={(e) => {
-                      if (e.target.checked) setPluginSettings({...pluginSettings, daysClosed: [...pluginSettings.daysClosed, day]});
-                      else setPluginSettings({...pluginSettings, daysClosed: pluginSettings.daysClosed.filter(d => d !== day)});
-                    }}
-                    className="auto-hidden absolute opacity-0"
+                    type="time"
+                    value={pluginSettings.openingTime}
+                    onChange={(e) => setPluginSettings({...pluginSettings, openingTime: e.target.value})}
+                    className="w-full bg-bg-base border border-border-subtle rounded-lg py-2.5 px-4 text-text-main shadow-sm focus:border-primary focus:ring-2 focus:ring-primary/20 outline-none transition-all"
                   />
-                  <span className="text-sm font-medium text-text-main select-none">{day}</span>
-                </label>
-              ))}
+                </div>
+              </div>
+              <div>
+                <label className="block text-sm font-semibold text-text-main mb-2">Closing Time</label>
+                <div className="relative">
+                  <input
+                    type="time"
+                    value={pluginSettings.closingTime}
+                    onChange={(e) => setPluginSettings({...pluginSettings, closingTime: e.target.value})}
+                    className="w-full bg-bg-base border border-border-subtle rounded-lg py-2.5 px-4 text-text-main shadow-sm focus:border-primary focus:ring-2 focus:ring-primary/20 outline-none transition-all"
+                  />
+                </div>
+              </div>
             </div>
-            <p className="text-sm text-text-muted mt-3">
-              Select the days your restaurant is completely closed.
-            </p>
-          </div>
-        </div>
-      </section>
 
-      {/* Reservation Limits */}
-      <section className="bg-bg-surface p-6 md:p-8 rounded-2xl border border-border-subtle shadow-sm mb-8">
-        <h2 className="text-xl font-bold text-text-main mb-6">
-          Reservation Limits
-        </h2>
-
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 max-w-2xl">
-          <div>
-            <label className="block text-sm font-semibold text-text-main mb-2">
-              Max Guests per Reservation
-            </label>
-            <input
-              type="number"
-              value={pluginSettings.maxGuests}
-              onChange={(e) => setPluginSettings({...pluginSettings, maxGuests: parseInt(e.target.value || '1', 10)})}
-              className="w-full bg-bg-base border border-border-subtle rounded-lg py-2.5 px-4 text-text-main shadow-sm focus:border-primary focus:ring-2 focus:ring-primary/20 outline-none transition-all"
-            />
-            <p className="text-xs text-text-muted mt-2">
-              Standard reservations will be capped at this number online.
-            </p>
+            <div>
+              <label className="block text-sm font-semibold text-text-main mb-3">Days Closed</label>
+              <div className="flex flex-wrap gap-2 md:gap-3 max-w-2xl">
+                {days.map(day => (
+                  <label key={day} className="relative flex cursor-pointer has-[:checked]:ring-2 has-[:checked]:ring-primary/50 has-[:checked]:bg-primary-soft rounded-lg border border-border-subtle px-4 py-2 hover:bg-bg-base transition-colors">
+                    <input
+                      type="checkbox"
+                      checked={pluginSettings.daysClosed.includes(day)}
+                      onChange={(e) => {
+                        if (e.target.checked) setPluginSettings({...pluginSettings, daysClosed: [...pluginSettings.daysClosed, day]});
+                        else setPluginSettings({...pluginSettings, daysClosed: pluginSettings.daysClosed.filter(d => d !== day)});
+                      }}
+                      className="auto-hidden absolute opacity-0"
+                    />
+                    <span className="text-sm font-medium text-text-main select-none">{day}</span>
+                  </label>
+                ))}
+              </div>
+              <p className="text-xs text-text-muted mt-3">Select the days your restaurant is completely closed.</p>
+            </div>
           </div>
 
+          <hr className="border-border-subtle" />
+
+          {/* Limits */}
           <div>
-            <label className="block text-sm font-semibold text-text-main mb-2">
-              Booking Buffer (Hours)
-            </label>
-            <input
-              type="number"
-              value={pluginSettings.bookingBuffer}
-              onChange={(e) => setPluginSettings({...pluginSettings, bookingBuffer: parseInt(e.target.value || '0', 10)})}
-              className="w-full bg-bg-base border border-border-subtle rounded-lg py-2.5 px-4 text-text-main shadow-sm focus:border-primary focus:ring-2 focus:ring-primary/20 outline-none transition-all"
-            />
-            <p className="text-xs text-text-muted mt-2">
-              Minimum hours in advance a booking must be made.
-            </p>
+            <h3 className="text-lg font-semibold text-text-main mb-6">Reservation Limits</h3>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 md:gap-8 max-w-2xl">
+              <div>
+                <label className="block text-sm font-semibold text-text-main mb-2">Max Guests per Reservation</label>
+                <input
+                  type="number"
+                  value={pluginSettings.maxGuests}
+                  onChange={(e) => setPluginSettings({...pluginSettings, maxGuests: parseInt(e.target.value || '1', 10)})}
+                  className="w-full bg-bg-base border border-border-subtle rounded-lg py-2.5 px-4 text-text-main shadow-sm focus:border-primary focus:ring-2 focus:ring-primary/20 outline-none transition-all"
+                />
+                <p className="text-xs text-text-muted mt-2">Standard reservations will be capped at this number online.</p>
+              </div>
+              <div>
+                <label className="block text-sm font-semibold text-text-main mb-2">Booking Buffer (Hours)</label>
+                <input
+                  type="number"
+                  value={pluginSettings.bookingBuffer}
+                  onChange={(e) => setPluginSettings({...pluginSettings, bookingBuffer: parseInt(e.target.value || '0', 10)})}
+                  className="w-full bg-bg-base border border-border-subtle rounded-lg py-2.5 px-4 text-text-main shadow-sm focus:border-primary focus:ring-2 focus:ring-primary/20 outline-none transition-all"
+                />
+                <p className="text-xs text-text-muted mt-2">Minimum hours in advance a booking must be made.</p>
+              </div>
+            </div>
           </div>
         </div>
       </section>

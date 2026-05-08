@@ -203,6 +203,15 @@ if ($action === 'delete_user') {
     exit;
 }
 
+if ($action === 'webhook') {
+    // This allows the WP plugin to POST to the dashboard to notify of changes.
+    // In a full setup, this might refresh local DB cache, but for now we acknowledge receipt.
+    $payload = file_get_contents('php://input');
+    // ... optional logging here ...
+    echo json_encode(['success' => true, 'message' => 'Webhook received']);
+    exit;
+}
+
 if ($action === 'wp_proxy') {
     if (!$user) { echo json_encode(['error' => 'Unauthorized']); exit; }
     
