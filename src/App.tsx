@@ -20,22 +20,8 @@ const tabs = [
 function MainLayout({ role, email }: { role: string; email: string }) {
   const [activeTab, setActiveTab] = useState('dashboard');
   const [appSettings, setAppSettings] = useState({ name: 'ResoAdmin', description: 'Management Center', logoUrl: '' });
-  const [needsSetup, setNeedsSetup] = useState(false);
-  const [checkingSetup, setCheckingSetup] = useState(true);
 
   useEffect(() => {
-    // Check if WP Config exists for installer
-    if (role === 'superadmin') {
-      WPServices.getConfig().then(config => {
-        if (!config || !config.url) {
-          setNeedsSetup(true);
-        }
-        setCheckingSetup(false);
-      });
-    } else {
-      setCheckingSetup(false);
-    }
-
     const unsub = onSnapshot(doc(db, 'settings', 'app'), (docSnap) => {
       if (docSnap.exists()) {
         setAppSettings(prev => ({ ...prev, ...docSnap.data() }));
@@ -47,14 +33,6 @@ function MainLayout({ role, email }: { role: string; email: string }) {
   const handleLogout = () => {
     signOut(auth);
   };
-
-  if (checkingSetup) {
-    return <div className="min-h-screen flex items-center justify-center bg-bg-base text-primary"><Loader2 className="w-8 h-8 animate-spin" /></div>;
-  }
-
-  if (needsSetup) {
-    return <Installer onComplete={() => setNeedsSetup(false)} />;
-  }
 
   return (
     <div className="flex h-screen bg-bg-base text-text-main font-sans overflow-hidden selection:bg-primary-soft selection:text-primary">
@@ -168,48 +146,81 @@ function MainLayout({ role, email }: { role: string; email: string }) {
 }
 
 export default function App() {
+  const [appState, setAppState] = useState<'loading' | 'install' | 'login' | 'app'>('loading');
   const [role, setRole] = useState<string | null>(null);
   const [email, setEmail] = useState<string | null>(null);
-  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const unsub = onAuthStateChanged(auth, async (user) => {
-      if (user) {
-        if (user.email === 'highprofiled@gmail.com') {
-          setRole('superadmin');
-          setEmail(user.email);
-        } else {
-          try {
-            const userDoc = await getDoc(doc(db, 'users', user.email!));
-            if (userDoc.exists()) {
-              setRole(userDoc.data().role || 'member');
-              setEmail(user.email);
-            } else {
-              await signOut(auth);
+    async function checkSetup() {
+      // Dynamic import to avoid using firestore objects before init
+      const { getStoredFirebaseConfig, auth, db } = await import('./lib/firebase');
+      
+      const config = getStoredFirebaseConfig();
+      if (!config) {
+        setAppState('install');
+        return;
+      }
+      
+      try {
+        const snap = await getDoc(doc(db, 'settings', 'app'));
+        if (!snap.exists()) {
+          setAppState('install');
+          return;
+        }
+      } catch (e: any) {
+        console.error("Setup check error:", e);
+        setAppState('install');
+        return;
+      }
+
+      onAuthStateChanged(auth, async (user) => {
+        if (user) {
+          if (user.email === 'highprofiled@gmail.com') {
+            setRole('superadmin');
+            setEmail(user.email);
+          } else {
+            try {
+              const userDoc = await getDoc(doc(db, 'users', user.email!));
+              if (userDoc.exists()) {
+                setRole(userDoc.data().role || 'member');
+                setEmail(user.email);
+              } else {
+                await signOut(auth);
+                setRole(null);
+                setEmail(null);
+              }
+            } catch (e) {
               setRole(null);
               setEmail(null);
             }
-          } catch (e) {
-            setRole(null);
-            setEmail(null);
           }
+          setAppState('app');
+        } else {
+          setRole(null);
+          setEmail(null);
+          setAppState('login');
         }
-      } else {
-        setRole(null);
-        setEmail(null);
-      }
-      setLoading(false);
-    });
-    return () => unsub();
+      });
+    }
+
+    checkSetup();
   }, []);
 
-  if (loading) {
+  if (appState === 'loading') {
     return <div className="min-h-screen flex items-center justify-center bg-bg-base text-primary"><Loader2 className="w-8 h-8 animate-spin" /></div>;
+  }
+
+  if (appState === 'install') {
+    return (
+      <ThemeProvider>
+        <Installer onComplete={() => window.location.reload()} />
+      </ThemeProvider>
+    );
   }
 
   return (
     <ThemeProvider>
-      {role && email ? <MainLayout role={role} email={email} /> : <Login onLogin={(r) => { /* Auth state listener handles this */ }} />}
+      {appState === 'app' && role && email ? <MainLayout role={role} email={email} /> : <Login onLogin={(r) => { /* Auth state listener handles this */ }} />}
     </ThemeProvider>
   );
 }

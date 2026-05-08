@@ -30,9 +30,12 @@ service cloud.firestore {
       allow update, delete: if isSuperAdmin();
     }
 
-    match /settings/{settingId} {
+    match /settings/app {
       allow read: if true;
       allow write: if isSuperAdmin();
+    }
+    match /settings/wp {
+      allow read, write: if isSuperAdmin();
     }
   }
 }

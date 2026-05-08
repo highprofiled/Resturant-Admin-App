@@ -1,11 +1,38 @@
-import { initializeApp } from 'firebase/app';
-import { getAuth, sendSignInLinkToEmail, isSignInWithEmailLink, signInWithEmailLink, signOut, sendPasswordResetEmail, signInWithEmailAndPassword } from 'firebase/auth';
-import { getFirestore, doc, setDoc, getDoc, collection, query, where, getDocs, updateDoc, deleteDoc, serverTimestamp, onSnapshot, getDocFromServer } from 'firebase/firestore';
-import firebaseConfig from '../../firebase-applet-config.json';
+import { initializeApp, getApps, FirebaseApp } from 'firebase/app';
+import { getAuth, Auth } from 'firebase/auth';
+import { getFirestore, Firestore, doc, setDoc, getDoc, collection, query, where, getDocs, updateDoc, deleteDoc, serverTimestamp, onSnapshot, getDocFromServer } from 'firebase/firestore';
+import defaultFirebaseConfig from '../../firebase-applet-config.json';
 
-const app = initializeApp(firebaseConfig);
-export const auth = getAuth(app);
-export const db = getFirestore(app, firebaseConfig.firestoreDatabaseId);
+export function getStoredFirebaseConfig() {
+  const local = window.localStorage.getItem('custom-firebase-config');
+  if (local) {
+    try { return JSON.parse(local); } catch(e){}
+  }
+  if (defaultFirebaseConfig && defaultFirebaseConfig.apiKey && defaultFirebaseConfig.apiKey.length > 0 && !defaultFirebaseConfig.apiKey.includes('YOUR_API_KEY')) {
+    return defaultFirebaseConfig;
+  }
+  return null;
+}
+
+export let app: FirebaseApp | any = null;
+export let auth: Auth | any = null;
+export let db: Firestore | any = null;
+
+export function initFirebase(config: any) {
+  if (getApps().length === 0) {
+    app = initializeApp(config);
+  } else {
+    app = getApps()[0];
+  }
+  auth = getAuth(app);
+  db = getFirestore(app, config.firestoreDatabaseId);
+  return { app, auth, db };
+}
+
+const config = getStoredFirebaseConfig();
+if (config) {
+  initFirebase(config);
+}
 
 export enum OperationType {
   CREATE = 'create',
@@ -40,6 +67,7 @@ export function handleFirestoreError(error: unknown, operationType: OperationTyp
 
 // Test connection
 async function testConnection() {
+  if (!db) return;
   try {
     await getDocFromServer(doc(db, 'test', 'connection'));
   } catch (error) {

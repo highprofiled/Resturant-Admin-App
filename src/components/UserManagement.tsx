@@ -16,15 +16,10 @@ export function UserManagement({ role, email: currentUserEmail }: { role: string
     try {
       let q = query(collection(db, 'users'));
       const querySnapshot = await getDocs(q);
-      const fetchedUsers = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-      
-      // Filter out superadmin for regular members (fallback incase rule allows read but we want to hide)
-      // Actually because of the rule, members might just get the docs they have access to if we used a secure backend, 
-      // but firestore throws error if they try to fetch all and rules block one.
-      // Wait, we need to handle that. If it throws permission denied, let's just show an error.
+      const fetchedUsers = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as any));
       
       if (role !== 'superadmin') {
-         setUsers(fetchedUsers.filter(u => u.email !== 'highprofiled@gmail.com'));
+         setUsers(fetchedUsers.filter((u: any) => u.email !== 'highprofiled@gmail.com'));
       } else {
          setUsers([{ email: 'highprofiled@gmail.com', role: 'superadmin' }, ...fetchedUsers]);
       }
