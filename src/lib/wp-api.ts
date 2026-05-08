@@ -97,7 +97,7 @@ export class WPServices {
         headers: this.getHeaders(config),
       });
 
-      if (!response.ok) throw new Error('Failed to fetch from WordPress');
+      if (!response.ok) throw new Error(`WordPress returned ${response.status}`);
       
       const data = await response.json();
       
@@ -113,8 +113,39 @@ export class WPServices {
         table: item.table || 'Unassigned',
         status: item.status === 'approved' ? 'Approved' : (item.status === 'declined' ? 'Declined' : 'Pending'),
       }));
-    } catch (error) {
+    } catch (error: any) {
       console.error("WP API Fetch Error:", error);
+      if (error.message.includes('Failed to fetch') || error.name === 'TypeError') {
+        throw new Error('Could not connect to WordPress. The URL might be incorrect, or CORS is blocking the request from this dashboard.');
+      }
+      throw new Error(error.message || 'Failed to fetch reservations');
+    }
+  }
+
+  static async updatePluginSettings(settings: any): Promise<boolean> {
+    const config = await this.getConfig();
+    if (!config || !config.url || !config.endpoint) {
+      console.log('Mock Update Plugin Settings:', settings);
+      return true; // Mock success
+    }
+
+    try {
+      const cleanUrl = config.url.replace(/\/$/, '');
+      const cleanEndpoint = config.endpoint.replace(/^\//, '').replace(/bookings\/?$/, 'settings'); // naive replace bookings with settings
+      
+      const response = await fetch(`${cleanUrl}/${cleanEndpoint}`, {
+        method: 'POST',
+        headers: this.getHeaders(config),
+        body: JSON.stringify(settings)
+      });
+
+      if (!response.ok) throw new Error('Failed to update plugin settings in WordPress');
+      return true;
+    } catch (error: any) {
+      console.error("WP API Settings Update Error:", error);
+      if (error.message.includes('Failed to fetch') || error.name === 'TypeError') {
+        throw new Error('WP API Settings Update Error: Could not connect to WordPress (Check CORS or Endpoint configuration).');
+      }
       throw error;
     }
   }

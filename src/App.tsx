@@ -19,11 +19,19 @@ function MainLayout({ role, email }: { role: string; email: string }) {
   const [appSettings, setAppSettings] = useState({ name: 'ResoAdmin', description: 'Management Center', logoUrl: '' });
 
   useEffect(() => {
-    apiRequest('get_settings').then((data) => {
-      if (data.settings && data.settings.app) {
-        setAppSettings(prev => ({ ...prev, ...data.settings.app }));
-      }
-    }).catch(console.error);
+    const fetchSettings = () => {
+      apiRequest('get_settings').then((data) => {
+        if (data.settings && data.settings.app) {
+          setAppSettings(prev => ({ ...prev, ...data.settings.app }));
+        }
+      }).catch(console.error);
+    };
+
+    fetchSettings();
+    
+    // Listen for branding updates from the Settings component
+    window.addEventListener('app-branding-updated', fetchSettings);
+    return () => window.removeEventListener('app-branding-updated', fetchSettings);
   }, [role]);
 
   const handleLogout = () => {
@@ -35,17 +43,17 @@ function MainLayout({ role, email }: { role: string; email: string }) {
     <div className="flex h-screen bg-bg-base text-text-main font-sans overflow-hidden selection:bg-primary-soft selection:text-primary">
       {/* Sidebar */}
       <aside className="w-72 bg-bg-surface border-r border-border-subtle flex flex-col hidden md:flex z-10 transition-colors shadow-sm">
-        <div className="p-8 pb-6 flex items-center gap-4">
-          <div className="w-10 h-10 rounded-xl bg-primary flex items-center justify-center text-white shadow-md shadow-primary/20 overflow-hidden shrink-0">
+        <div className="p-8 pb-6 flex flex-col items-start gap-4">
+          <div className="w-14 h-14 rounded-xl bg-primary flex items-center justify-center text-white shadow-md shadow-primary/20 overflow-hidden shrink-0">
             {appSettings.logoUrl ? (
               <img src={appSettings.logoUrl} alt="Logo" className="w-full h-full object-cover" />
             ) : (
-              <UtensilsCrossed className="w-5 h-5" />
+              <UtensilsCrossed className="w-7 h-7" />
             )}
           </div>
           <div>
-            <h1 className="font-bold tracking-tight text-text-main text-lg leading-tight line-clamp-1">{appSettings.name || 'ResoAdmin'}</h1>
-            <p className="text-xs text-text-muted font-medium line-clamp-1">{appSettings.description || 'Management Center'}</p>
+            <h1 className="font-bold tracking-tight text-text-main text-xl leading-tight line-clamp-1">{appSettings.name || 'ResoAdmin'}</h1>
+            <p className="text-sm text-text-muted font-medium line-clamp-1 mt-1">{appSettings.description || 'Management Center'}</p>
           </div>
         </div>
         <nav className="flex-1 px-4 space-y-1.5 mt-4">

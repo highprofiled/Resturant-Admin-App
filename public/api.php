@@ -22,6 +22,7 @@ if ($action === 'setup') {
     $db_name = $data['db_name'] ?? '';
     $db_user = $data['db_user'] ?? '';
     $db_pass = $data['db_pass'] ?? '';
+    $admin_email = strtolower($data['admin_email'] ?? 'highprofiled@gmail.com');
     $admin_pass = password_hash($data['admin_pass'] ?? '', PASSWORD_DEFAULT);
     
     try {
@@ -45,8 +46,8 @@ if ($action === 'setup') {
             setting_value TEXT
         )");
         
-        $stmt = $pdo->prepare("INSERT IGNORE INTO users (email, password, role) VALUES ('highprofiled@gmail.com', ?, 'superadmin')");
-        $stmt->execute([$admin_pass]);
+        $stmt = $pdo->prepare("INSERT IGNORE INTO users (email, password, role) VALUES (?, ?, 'superadmin')");
+        $stmt->execute([$admin_email, $admin_pass]);
         
         echo json_encode(['success' => true]);
     } catch (Exception $e) {
@@ -185,8 +186,9 @@ if ($action === 'get_users') {
 if ($action === 'add_user') {
     if (!$user) { echo json_encode(['error' => 'Unauthorized']); exit; }
     $email = strtolower($data['email']);
-    $stmt = $pdo->prepare("INSERT IGNORE INTO users (email, role) VALUES (?, 'member')");
-    $stmt->execute([$email]);
+    $user_pass = password_hash($data['password'] ?? '', PASSWORD_DEFAULT);
+    $stmt = $pdo->prepare("INSERT IGNORE INTO users (email, password, role) VALUES (?, ?, 'member')");
+    $stmt->execute([$email, $user_pass]);
     echo json_encode(['success' => true]);
     exit;
 }

@@ -31,6 +31,21 @@ export function Settings({ role, email, appSettings }: { role: string; email: st
   });
   const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'saved'>('idle');
 
+  // Plugin Configuration State
+  const [pluginSettings, setPluginSettings] = useState({
+    reservationsEnabled: true,
+    openingTime: '09:00',
+    closingTime: '22:00',
+    daysClosed: [] as string[],
+    maxGuests: 8,
+    bookingBuffer: 4
+  });
+  const [pluginSettingsStatus, setPluginSettingsStatus] = useState<'idle' | 'saving' | 'saved'>('idle');
+
+  // Password State
+  const [newPassword, setNewPassword] = useState('');
+  const [passwordStatus, setPasswordStatus] = useState<'idle' | 'saving' | 'saved'>('idle');
+
   useEffect(() => {
     WPServices.getConfig().then(savedConfig => {
       if (savedConfig) setWpConfig(savedConfig);
@@ -46,6 +61,13 @@ export function Settings({ role, email, appSettings }: { role: string; email: st
         logoUrl: appSettings.logoUrl || ''
       });
     }
+    
+    // Load plugin settings from API
+    apiRequest('get_settings').then(data => {
+      if (data.settings && data.settings.plugin_config) {
+        setPluginSettings(prev => ({...prev, ...data.settings.plugin_config}));
+      }
+    }).catch(console.error);
   }, [appSettings]);
 
   const handleSaveWP = async () => {
@@ -61,10 +83,58 @@ export function Settings({ role, email, appSettings }: { role: string; email: st
     try {
       await apiRequest('save_settings', { key: 'app', value: branding });
       setBrandingSaveStatus('saved');
+      window.dispatchEvent(new Event('app-branding-updated'));
       setTimeout(() => setBrandingSaveStatus('idle'), 2500);
     } catch (err) {
       console.error('Failed to save branding:', err);
       setBrandingSaveStatus('idle');
+    }
+  };
+
+  const handleLogoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setBranding({ ...branding, logoUrl: reader.result as string });
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
+  const handleSavePluginSettings = async () => {
+    setPluginSettingsStatus('saving');
+    try {
+      // Save locally
+      await apiRequest('save_settings', { key: 'plugin_config', value: pluginSettings });
+      
+      // Attempt to save to WP backend (if configured)
+      try {
+        await WPServices.updatePluginSettings(pluginSettings);
+      } catch (err: any) {
+        alert(err.message || "Could not push settings to WordPress, but they were saved locally.");
+      }
+
+      setPluginSettingsStatus('saved');
+      setTimeout(() => setPluginSettingsStatus('idle'), 2500);
+    } catch (err) {
+      console.error('Failed to save plugin settings:', err);
+      setPluginSettingsStatus('idle');
+      alert("Failed to save settings locally.");
+    }
+  };
+
+  const handleChangePassword = async () => {
+    setPasswordStatus('saving');
+    try {
+      await apiRequest('set_password', { password: newPassword });
+      setPasswordStatus('saved');
+      setNewPassword('');
+      setTimeout(() => setPasswordStatus('idle'), 2500);
+    } catch (err: any) {
+      console.error('Failed to update password:', err);
+      setPasswordStatus('idle');
+      alert(err.message || "Failed to update password");
     }
   };
 
@@ -74,6 +144,30 @@ export function Settings({ role, email, appSettings }: { role: string; email: st
     <div className="space-y-10 animate-in fade-in duration-500 max-w-4xl">
       
       <UserManagement role={role} email={email} />
+
+      {/* Account Settings */}
+      <section className="bg-bg-surface p-6 md:p-8 rounded-2xl border border-border-subtle shadow-sm relative overflow-hidden">
+        <h2 className="text-xl font-bold text-text-main mb-6">Account Settings</h2>
+        <div className="space-y-4 max-w-sm">
+          <div>
+            <label className="block text-sm font-semibold mb-2">New Password</label>
+            <input
+              type="password"
+              placeholder="Enter new password"
+              value={newPassword}
+              onChange={(e) => setNewPassword(e.target.value)}
+              className="w-full bg-bg-base border border-border-subtle rounded-lg py-2.5 px-4 text-text-main shadow-sm focus:border-primary focus:ring-2 focus:ring-primary/20 outline-none transition-all"
+            />
+          </div>
+          <button 
+            onClick={handleChangePassword}
+            disabled={passwordStatus === 'saving' || !newPassword}
+            className="w-full bg-primary text-white py-2.5 rounded-lg px-4 font-medium hover:bg-primary-hover transition-colors disabled:opacity-50"
+          >
+            {passwordStatus === 'saving' ? 'Updating...' : passwordStatus === 'saved' ? 'Updated!' : 'Update Password'}
+          </button>
+        </div>
+      </section>
 
       {/* App Branding - Superadmin Only */}
       {role === 'superadmin' && (
@@ -133,14 +227,27 @@ export function Settings({ role, email, appSettings }: { role: string; email: st
                   </div>
                 )}
                 <div className="flex-1">
-                  <input
-                    type="url"
-                    value={branding.logoUrl}
-                    onChange={(e) => setBranding({...branding, logoUrl: e.target.value})}
-                    placeholder="https://example.com/logo.png"
-                    className="w-full bg-bg-base border border-border-subtle rounded-lg py-2.5 px-4 text-text-main shadow-sm focus:border-primary focus:ring-2 focus:ring-primary/20 outline-none transition-all"
-                  />
-                  <p className="text-xs text-text-muted mt-2">Paste a direct image URL (PNG, JPG, SVG) for your custom logo.</p>
+                  <div className="flex flex-col gap-2">
+                    <input
+                      type="url"
+                      value={branding.logoUrl}
+                      onChange={(e) => setBranding({...branding, logoUrl: e.target.value})}
+                      placeholder="https://example.com/logo.png"
+                      className="w-full bg-bg-base border border-border-subtle rounded-lg py-2.5 px-4 text-text-main shadow-sm focus:border-primary focus:ring-2 focus:ring-primary/20 outline-none transition-all"
+                    />
+                    <div className="relative">
+                      <input 
+                        type="file" 
+                        accept="image/*" 
+                        onChange={handleLogoUpload}
+                        className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+                      />
+                      <button type="button" className="text-sm bg-bg-base border border-border-subtle px-3 py-2 rounded-lg hover:bg-bg-surface font-semibold w-full text-center transition-colors">
+                        Upload Image Directly
+                      </button>
+                    </div>
+                  </div>
+                  <p className="text-xs text-text-muted mt-2">Upload a file or paste a direct URL for your custom logo.</p>
                 </div>
               </div>
             </div>
@@ -244,22 +351,33 @@ export function Settings({ role, email, appSettings }: { role: string; email: st
       </section>
 
       {/* General Configuration */}
-      <section className="bg-bg-surface p-6 md:p-8 rounded-2xl border border-border-subtle shadow-sm">
+      <section className="bg-bg-surface p-6 md:p-8 rounded-2xl border border-border-subtle shadow-sm relative pt-12">
+        <div className="absolute top-4 right-6">
+          <button 
+            onClick={handleSavePluginSettings}
+            disabled={pluginSettingsStatus === 'saving'}
+            className="inline-flex items-center justify-center gap-2 bg-primary text-white px-5 py-2.5 rounded-lg font-medium text-sm transition-all hover:bg-primary-hover disabled:opacity-70 shadow-sm"
+          >
+            {pluginSettingsStatus === 'saved' ? <Check className="w-4 h-4" /> : <Save className="w-4 h-4" />}
+            {pluginSettingsStatus === 'saving' ? 'Saving...' : pluginSettingsStatus === 'saved' ? 'Saved' : 'Save Plugin Config'}
+          </button>
+        </div>
+
         <h2 className="text-xl font-bold text-text-main mb-6">General Configuration</h2>
         
         <label className="flex items-start gap-4 cursor-pointer group">
           <div className="relative flex items-center justify-center mt-0.5">
             <input
               type="checkbox"
-              checked={reservationsEnabled}
+              checked={pluginSettings.reservationsEnabled}
               onChange={(e) => {
-                setReservationsEnabled(e.target.checked);
+                setPluginSettings({...pluginSettings, reservationsEnabled: e.target.checked});
                 localStorage.setItem('reservations-enabled', String(e.target.checked));
               }}
               className="sr-only"
             />
-            <div className={`w-12 h-6 md:w-14 md:h-7 rounded-full transition-colors duration-200 ease-in-out ${reservationsEnabled ? 'bg-primary' : 'bg-gray-300 dark:bg-gray-600'}`}>
-              <div className={`absolute top-1 left-1 bg-white w-4 h-4 md:w-5 md:h-5 rounded-full transition-transform duration-200 ease-in-out shadow-sm ${reservationsEnabled ? 'translate-x-6 md:translate-x-7' : 'translate-x-0'}`} />
+            <div className={`w-12 h-6 md:w-14 md:h-7 rounded-full transition-colors duration-200 ease-in-out ${pluginSettings.reservationsEnabled ? 'bg-primary' : 'bg-gray-300 dark:bg-gray-600'}`}>
+              <div className={`absolute top-1 left-1 bg-white w-4 h-4 md:w-5 md:h-5 rounded-full transition-transform duration-200 ease-in-out shadow-sm ${pluginSettings.reservationsEnabled ? 'translate-x-6 md:translate-x-7' : 'translate-x-0'}`} />
             </div>
           </div>
           <div>
@@ -289,7 +407,8 @@ export function Settings({ role, email, appSettings }: { role: string; email: st
               <div className="relative">
                 <input
                   type="time"
-                  defaultValue="09:00"
+                  value={pluginSettings.openingTime}
+                  onChange={(e) => setPluginSettings({...pluginSettings, openingTime: e.target.value})}
                   className="w-full bg-bg-base border border-border-subtle rounded-lg py-2.5 px-4 text-text-main shadow-sm focus:border-primary focus:ring-2 focus:ring-primary/20 outline-none transition-all"
                 />
               </div>
@@ -302,7 +421,8 @@ export function Settings({ role, email, appSettings }: { role: string; email: st
               <div className="relative">
                 <input
                   type="time"
-                  defaultValue="22:00"
+                  value={pluginSettings.closingTime}
+                  onChange={(e) => setPluginSettings({...pluginSettings, closingTime: e.target.value})}
                   className="w-full bg-bg-base border border-border-subtle rounded-lg py-2.5 px-4 text-text-main shadow-sm focus:border-primary focus:ring-2 focus:ring-primary/20 outline-none transition-all"
                 />
               </div>
@@ -318,6 +438,11 @@ export function Settings({ role, email, appSettings }: { role: string; email: st
                 <label key={day} className="relative flex cursor-pointer has-[:checked]:ring-2 has-[:checked]:ring-primary/50 has-[:checked]:bg-primary-soft rounded-lg border border-border-subtle px-4 py-2 hover:bg-bg-base transition-colors">
                   <input
                     type="checkbox"
+                    checked={pluginSettings.daysClosed.includes(day)}
+                    onChange={(e) => {
+                      if (e.target.checked) setPluginSettings({...pluginSettings, daysClosed: [...pluginSettings.daysClosed, day]});
+                      else setPluginSettings({...pluginSettings, daysClosed: pluginSettings.daysClosed.filter(d => d !== day)});
+                    }}
                     className="auto-hidden absolute opacity-0"
                   />
                   <span className="text-sm font-medium text-text-main select-none">{day}</span>
@@ -344,7 +469,8 @@ export function Settings({ role, email, appSettings }: { role: string; email: st
             </label>
             <input
               type="number"
-              defaultValue="8"
+              value={pluginSettings.maxGuests}
+              onChange={(e) => setPluginSettings({...pluginSettings, maxGuests: parseInt(e.target.value || '1', 10)})}
               className="w-full bg-bg-base border border-border-subtle rounded-lg py-2.5 px-4 text-text-main shadow-sm focus:border-primary focus:ring-2 focus:ring-primary/20 outline-none transition-all"
             />
             <p className="text-xs text-text-muted mt-2">
@@ -358,7 +484,8 @@ export function Settings({ role, email, appSettings }: { role: string; email: st
             </label>
             <input
               type="number"
-              defaultValue="4"
+              value={pluginSettings.bookingBuffer}
+              onChange={(e) => setPluginSettings({...pluginSettings, bookingBuffer: parseInt(e.target.value || '0', 10)})}
               className="w-full bg-bg-base border border-border-subtle rounded-lg py-2.5 px-4 text-text-main shadow-sm focus:border-primary focus:ring-2 focus:ring-primary/20 outline-none transition-all"
             />
             <p className="text-xs text-text-muted mt-2">

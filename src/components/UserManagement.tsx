@@ -8,6 +8,7 @@ export function UserManagement({ role, email: currentUserEmail }: { role: string
   const [error, setError] = useState('');
   
   const [newEmail, setNewEmail] = useState('');
+  const [newPassword, setNewPassword] = useState('');
   const [isAdding, setIsAdding] = useState(false);
 
   const fetchUsers = async () => {
@@ -42,8 +43,9 @@ export function UserManagement({ role, email: currentUserEmail }: { role: string
           throw new Error("User already exists");
       }
 
-      await apiRequest('add_user', { email: emailLower });
+      await apiRequest('add_user', { email: emailLower, password: newPassword });
       setNewEmail('');
+      setNewPassword('');
       await fetchUsers();
     } catch (err: any) {
        setError(err.message || 'Could not add user.');
@@ -100,20 +102,29 @@ export function UserManagement({ role, email: currentUserEmail }: { role: string
                 value={newEmail}
                 onChange={(e) => setNewEmail(e.target.value)}
                 placeholder="colleague@example.com"
+                className="w-full bg-bg-surface border border-border-subtle rounded-lg py-2 px-3 text-sm text-text-main shadow-sm focus:border-primary focus:ring-2 focus:ring-primary/20 outline-none transition-all mb-4"
+                required
+              />
+              <label className="block text-xs font-semibold text-text-muted mb-1.5 uppercase tracking-wider">Password</label>
+              <input
+                type="password"
+                value={newPassword}
+                onChange={(e) => setNewPassword(e.target.value)}
+                placeholder="Set user password..."
                 className="w-full bg-bg-surface border border-border-subtle rounded-lg py-2 px-3 text-sm text-text-main shadow-sm focus:border-primary focus:ring-2 focus:ring-primary/20 outline-none transition-all"
                 required
               />
             </div>
             <button
               type="submit"
-              disabled={isAdding}
+              disabled={isAdding || !newEmail || !newPassword}
               className="w-full bg-primary hover:bg-primary-hover text-white px-4 py-2 rounded-lg font-medium text-sm transition-all shadow-sm flex items-center justify-center gap-2 disabled:opacity-50"
             >
               <UserPlus className="w-4 h-4" />
               {isAdding ? 'Inviting...' : 'Add Member'}
             </button>
             <p className="text-xs text-text-muted mt-2">
-              New members can log in using their email address via the Magic Link option. Note: Magic Links require your shared hosting email configuration to be working.
+              New members can log in using their email address and the password you set.
             </p>
           </form>
         </div>

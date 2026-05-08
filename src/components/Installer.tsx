@@ -11,6 +11,7 @@ export function Installer({ onComplete }: { onComplete: () => void }) {
   const [dbConfig, setDbConfig] = useState({ host: 'localhost', name: '', user: '', pass: '' });
   
   // Step 3: Superadmin
+  const [adminEmail, setAdminEmail] = useState('highprofiled@gmail.com');
   const [adminPassword, setAdminPassword] = useState('');
 
   // Step 4: WP
@@ -42,11 +43,12 @@ export function Installer({ onComplete }: { onComplete: () => void }) {
           db_name: dbConfig.name,
           db_user: dbConfig.user,
           db_pass: dbConfig.pass,
+          admin_email: adminEmail,
           admin_pass: adminPassword
         });
 
         // Automatically log in to get token
-        const loginRes = await apiRequest('login', { email: 'highprofiled@gmail.com', password: adminPassword });
+        const loginRes = await apiRequest('login', { email: adminEmail, password: adminPassword });
         window.localStorage.setItem('auth_token', loginRes.token);
         
         setStep(4);
@@ -175,11 +177,20 @@ export function Installer({ onComplete }: { onComplete: () => void }) {
                 <h2 className="text-2xl font-bold text-text-main">Superadmin Account</h2>
               </div>
               <p className="text-text-muted mb-6 text-sm">
-                Your superadmin email is securely locked to <strong className="text-text-main">highprofiled@gmail.com</strong>.
-                Set a password to create your account and install tables in the database.
+                Set an email and password to create your superadmin account and install tables in the database.
               </p>
 
               <div className="space-y-4">
+                <div>
+                  <label className="block text-sm font-semibold mb-2">Superadmin Email</label>
+                  <input
+                    type="email"
+                    value={adminEmail}
+                    onChange={(e) => setAdminEmail(e.target.value)}
+                    placeholder="Enter an email..."
+                    className="w-full bg-bg-base border border-border-subtle rounded-xl py-3 px-4 text-text-main shadow-sm focus:border-primary focus:ring-2 focus:ring-primary/20 outline-none transition-all"
+                  />
+                </div>
                 <div>
                   <label className="block text-sm font-semibold mb-2">Superadmin Password</label>
                   <input
@@ -195,7 +206,7 @@ export function Installer({ onComplete }: { onComplete: () => void }) {
               <div className="mt-8 flex justify-end">
                 <button 
                   onClick={handleNext}
-                  disabled={loading || !adminPassword}
+                  disabled={loading || !adminPassword || !adminEmail}
                   className="bg-primary text-white px-8 py-3 rounded-xl font-bold flex items-center justify-center gap-2 hover:bg-primary-hover shadow-lg shadow-primary/30 transition-all disabled:opacity-50"
                 >
                   {loading ? 'Installing into DB...' : 'Install & Setup'} <ArrowRight className="w-5 h-5" />
